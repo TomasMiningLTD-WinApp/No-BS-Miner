@@ -1,5 +1,3 @@
-#using module .\Include.psm1
-
 param(
     [Parameter(Mandatory = $false)]
     [Array]$Algorithm = $null,
@@ -22,36 +20,7 @@ param(
 
 )
 
-
-
 . .\Include.ps1
-
-##Parameters for testing, must be commented on real use
-
-
-#$MiningMode='Automatic'
-#$MiningMode='Manual'
-
-#$PoolsName=('ahashpool','miningpoolhub','hashrefinery')
-#$PoolsName='whattomine'
-#$PoolsName='zergpool'
-#$PoolsName='yiimp'
-#$PoolsName='ahashpool'
-#$PoolsName=('hashrefinery','zpool')
-#$PoolsName='miningpoolhub'
-#$PoolsName='zpool'
-#$PoolsName='hashrefinery'
-#$PoolsName='altminer'
-#$PoolsName='blazepool'
-
-#$PoolsName="Nicehash"
-#$PoolsName="Nanopool"
-
-#$Coinsname =('bitcore','Signatum','Zcash')
-#$Coinsname ='zcash'
-#$Algorithm =('phi','x17')
-
-#$Groupnames=('rx580')
 
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12'
 
@@ -183,7 +152,7 @@ WriteLog $msg $LogFile $False
 #----------------------------------------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------------------------------------
-#This loop will be runnig forever
+#This loop runs forever
 #----------------------------------------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------------------------------------
@@ -226,8 +195,70 @@ while ($true) {
     
     $DelayCloseMiners=[int]($config.DELAYCLOSEMINERS)        
   
+     #Donation
+    $LastIntervalTime= (get-date) - $IntervalStartAt
+    $IntervalStartAt = (Get-Date)
+    $DonationPastTime= ((Get-Content Donation.ctr) -split '_')[0]
+    $DonatedTime = ((Get-Content Donation.ctr) -split '_')[1]
+
+    If ($DonationPastTime -eq $null -or $DonationPastTime -eq "" ) {$DonationPastTime=0}
+    If ($DonatedTime -eq $null -or $DonatedTime -eq "" ) {$DonatedTime=0}
+
+    $ElapsedDonationTime = [int]($DonationPastTime) + $LastIntervalTime.minutes + ($LastIntervalTime.hours *60)
+    $ElapsedDonatedTime = [int]($DonatedTime) + $LastIntervalTime.minutes + ($LastIntervalTime.hours *60)
+
+    
+    $ConfigDonateTime= [int]($config.DONATE)
+    
+    #if ($DonateTime -gt 5) {[int]$DonateTime=5}
+    
+    #Activate or deactivate donation
+    if ($ElapsedDonationTime -gt 1440 -and $ConfigDonateTime -gt 0) { # donation interval
+
+    $DonationInterval = $true
+    $UserName = "ZKunj"
+    $WorkerName = "Donate"
+    $CoinsWallets=@{} 
+    $CoinsWallets.add("BTC","1NUcGG4H7hADUsJkQVShhkUJMipjup42KK")
+
+    $NextInterval= ($ConfigDonateTime *60) - ($ElapsedDonatedTime *60)
+
+    $Algorithm=$null
+    $PoolsName="DonationPool"
+    $CoinsName=$null
+    $MiningMode="Automatic"
+
+    if ($ElapsedDonatedTime -ge $ConfigDonateTime) {"0_0" | Set-Content  -Path Donation.ctr} else {[string]$DonationPastTime+"_"+[string]$ElapsedDonatedTime | Set-Content  -Path Donation.ctr}
+
+    WriteLog ("Next interval you will be donating , thanks for your support") $LogFile $True
+
+    }
+    else { #NOT donation interval
+        $DonationInterval = $false
+        #get interval time based on pool kind (pps/ppls)
+        $NextInterval=0
+        Get_Pools -Querymode "Info" -PoolsFilterList $PoolsName -CoinFilterList $CoinsName -Location $Location -AlgoFilterList $Algorithm | foreach-object {
+            $PItime=$config.("INTERVAL_"+$_.Rewardtype)
+            if ([int]$PItime -gt $NextInterval) {$NextInterval= [int]$PItime}
+            }
+
+        $Algorithm=$ParamAlgorithmBCK
+        $PoolsName=$ParamPoolsNameBCK
+        $CoinsName=$ParamCoinsNameBCK
+        $MiningMode=$ParamMiningModeBCK
+        $UserName= $config.USERNAME
+        $WorkerName= $config.WORKERNAME
+        $CoinsWallets=@{} 
+        ((Get-Content config.txt | Where-Object {$_ -like '@@WALLET_*=*'}) -replace '@@WALLET_*=*','').TrimEnd() | ForEach-Object {$CoinsWallets.add(($_ -split "=")[0],($_ -split "=")[1])}
+
+        [string]$ElapsedDonationTime+"_0" | Set-Content  -Path Donation.ctr
+
+     }
+
+
     
     ErrorsToLog $LogFile
+
 
     #KUN: call api for USD/HRK conversion
     try {
@@ -1003,7 +1034,7 @@ while ($true) {
         Print_Horizontal_line
         "  (E)nd Interval   (P)rofits    (C)urrent    (H)istory    (W)allets    (S)tats" | Out-host
       
-
+        if ($DonationInterval) {" THIS INTERVAL YOU ARE DONATING, YOU CAN INCREASE OR DECREASE DONATION ON CONFIG.TXT, THANK YOU FOR YOUR SUPPORT !!!!"}
 
         #write speed 
         if ($DetailedLog) {writelog ($ActiveMiners | Where-Object Status -eq 'Running'| select-object id,process.Id,groupname,name,poolabbname,Algorithm,AlgorithmDual,SpeedLive,ProfitsLive,location,port,arguments |ConvertTo-Json) $logfile $false}
