@@ -1,4 +1,6 @@
-﻿---- POOLS SUPORTED ---------------------------------------
+﻿Early work in progress, Based on tutulino/Megaminer. Come back later! 
+ 
+ ---- POOLS SUPORTED ---------------------------------------
 
 AHASHPOOL -- Anonymous, autoexchange to selected coin in config.txt
 ALTMINER -- Anonymous, no autoexchange, must set a wallet for each coin
